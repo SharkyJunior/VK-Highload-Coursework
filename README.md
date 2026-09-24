@@ -159,8 +159,6 @@
 | Face recognition      | **~23 148 / ~46 296** | `2 млрд / 86400`               |
 | **Итого**             | **~48 745 / ~97 490** |                                |
 
-## Список источников
-
 [^1]: Sabharwal A. 500 million people using Google Photos, and three new ways to share // Google. 17 May 2017. URL: https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing
 [^2]: DAU/MAU Ratio (Stickiness): Definition, Formula & Benchmarks // IdeaPlan. 2024. URL: https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness
 
