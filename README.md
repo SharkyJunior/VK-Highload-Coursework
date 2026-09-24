@@ -158,3 +158,14 @@
 | Уведомления           |       **~260 / ~521** | `22,5M / 86400`                |
 | Face recognition      | **~23 148 / ~46 296** | `2 млрд / 86400`               |
 | **Итого**             | **~48 745 / ~97 490** |                                |
+
+
+## Список источников
+1. Sabharwal A. 500 million people using Google Photos, and three new ways to share // Google. 17 May 2017. URL: https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing
+2. DAU/MAU Ratio (Stickiness): Definition, Formula & Benchmarks // IdeaPlan. 2024. URL: https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness
+3. Woolf M. 26+ Mobile Photography Statistics for 2026 // PhotoAiD. 2023, обновлено 9 Dec. 2025. URL: https://photoaid.com/blog/mobile-photography-statistics/ (дата обращения: 24.09.2026).
+4. Schafer D. Cloud Storage Pricing Guide: Compare Google One, iCloud, OneDrive, Dropbox, and More // All About Cookies. 24 June 2026. URL: https://allaboutcookies.org/cloud-storage-pricing
+5. Gupta A. Personal Cloud Market Size, Share & Trends [2035] // Market Research Future. 2026. URL: https://www.marketresearchfuture.com/reports/personal-cloud-market-7041
+6. Gracia-Tinedo R., Tian Y., Sampé J., Harkous H., Lenton J., García-López P., Sánchez-Artigas M., Vukolić M. Dissecting UbuntuOne: Autopsy of a Global-scale Personal Cloud Back-end // Proceedings of the 2015 Internet Measurement Conference. 2015. DOI: 10.1145/2815675.2815677. URL: https://www.researchgate.net/publication/282334268_Dissecting_UbuntuOne_Autopsy_of_a_Global-scale_Personal_Cloud_Back-end
+7. Selier J. Ask Photos: A new way to search your photos with Gemini // Google. 14 May 2024. URL: https://blog.google/products-and-platforms/products/photos/ask-photos-google-io-2024/
+8. Ben-Yair S. 10 tips for 10 years of Google Photos // Google. 28 May 2025. URL: https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/
