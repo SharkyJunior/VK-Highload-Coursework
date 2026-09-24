@@ -6,7 +6,7 @@
 
 **Аудитория сервиса:**
 
-- По данным Google на май 2017 года, сервис Google Photos достиг **500 млн. активных пользователей в месяц**. Кроме того, общее количество загружаемых фотографий достигло 1.2 млрд/день. [[1](https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing/)]
+- По данным Google на май 2017 года, сервис Google Photos достиг **500 млн. активных пользователей в месяц**. Кроме того, общее количество загружаемых фотографий достигло 1.2 млрд/день. [^1]
 
 **Функционал MVP:**
 
@@ -26,9 +26,9 @@
 
 | Показатель             |      Значение | Расчёт / источник                                                                                                                                                                                                                       |
 | ---------------------- | ------------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MAU                    |  **~500 млн** | Google в мае 2017 года сообщала о более чем 500 млн активных пользователей в месяц. [[1](https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing/)]                                            |
-| DAU                    |   **~75 млн** | `500 млн * 0,15 = 75 млн`. Коэффициент `DAU / MAU = 0,15` принимается как инженерное допущение на основе опубликованных benchmark-значений stickiness. [[2](https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness)]                  |
-| Средний размер галереи | **2795 фото** | Среднестатистический пользователь смартфона хранит около 2795 фотографий в фотоплёнке. Значение используется как приближение среднего размера пользовательской галереи. [[3](https://photoaid.com/blog/mobile-photography-statistics/)] |
+| MAU                    |  **~500 млн** | Google в мае 2017 года сообщала о более чем 500 млн активных пользователей в месяц. [^1]                                            |
+| DAU                    |   **~75 млн** | `500 млн * 0,15 = 75 млн`. Коэффициент `DAU / MAU = 0,15` принимается как инженерное допущение на основе опубликованных benchmark-значений stickiness. [^2]                  |
+| Средний размер галереи | **2795 фото** | Среднестатистический пользователь смартфона хранит около 2795 фотографий в фотоплёнке. Значение используется как приближение среднего размера пользовательской галереи. [^3] |
 
 Значение 2795 фотографий относится к фотоплёнке пользователя смартфона, а не непосредственно к Google Photos. Поэтому в данной работе оно используется как приближённая оценка размера пользовательской галереи. Это позволяет получить независимую проверку порядка необходимого объёма хранения.
 
@@ -38,17 +38,17 @@
 
 | Тип действия                    | Среднее количество действий на 1 DAU в день | Как получено                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Действий в день при 75M DAU |
 | ------------------------------- | ------------------------------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------: |
-| Авторизация / session           |                                    **1,09** | В исследовании Ubuntu One зафиксировано 42,5 млн пользовательских сессий за 30 дней при 1,294794 млн пользователей: `42,5 млн / 1,294794 млн / 30 ≈ 1,09 сессии/пользователя/день`. Значение используется как ориентир для personal-cloud сервиса. [[6](https://www.researchgate.net/publication/282334268_Dissecting_UbuntuOne_Autopsy_of_a_Global-scale_Personal_Cloud_Back-end)]                                                                                    |       `1,09 * 75M = 81,75M` |
-| Загрузка фото                   |                                   **26,67** | Google сообщила о более чем 6 млрд загружаемых фото и видео в день. В 2025 году Google Photos имел более 1,5 млрд MAU. Сначала получаем `6 млрд / 1,5 млрд = 4` загрузки на MAU в день, затем переносим показатель на проектируемую аудиторию: `4 * 500/75 ≈ 26,67`. [[7](https://blog.google/products-and-platforms/products/photos/ask-photos-google-io-2024/)][[8](https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/)] |    `26,67 * 75M ≈ 2,0 млрд` |
-| Скачивание фото                 |                                    **1,00** | В исследовании Ubuntu One указано около 5 transfer operations на пользователя в день, однако upload и download там не разделяются. Поэтому для проектируемого photo-storage сервиса принимается инженерное допущение **1 скачивание/DAU/день**. [[6](https://www.researchgate.net/publication/282334268_Dissecting_UbuntuOne_Autopsy_of_a_Global-scale_Personal_Cloud_Back-end)]                                                                                       |          `1,00 * 75M = 75M` |
+| Авторизация / session           |                                    **1,09** | В исследовании Ubuntu One зафиксировано 42,5 млн пользовательских сессий за 30 дней при 1,294794 млн пользователей: `42,5 млн / 1,294794 млн / 30 ≈ 1,09 сессии/пользователя/день`. Значение используется как ориентир для personal-cloud сервиса. [^6]                                                                                    |       `1,09 * 75M = 81,75M` |
+| Загрузка фото                   |                                   **26,67** | Google сообщила о более чем 6 млрд загружаемых фото и видео в день. В 2025 году Google Photos имел более 1,5 млрд MAU. Сначала получаем `6 млрд / 1,5 млрд = 4` загрузки на MAU в день, затем переносим показатель на проектируемую аудиторию: `4 * 500/75 ≈ 26,67`. [^7][^8] |    `26,67 * 75M ≈ 2,0 млрд` |
+| Скачивание фото                 |                                    **1,00** | В исследовании Ubuntu One указано около 5 transfer operations на пользователя в день, однако upload и download там не разделяются. Поэтому для проектируемого photo-storage сервиса принимается инженерное допущение **1 скачивание/DAU/день**. [^6]                                                                                       |          `1,00 * 75M = 75M` |
 | Распознавание лиц на новых фото |                                   **26,67** | Принимается одна фоновая задача распознавания для каждого нового загруженного фото/медиаобъекта: `1 * количество загрузок = 26,67 операции/DAU/день`. Речь идёт об одной задаче обработки фотографии, а не об отдельной операции на каждое найденное лицо.                                                                                                                                                                                                             |    `26,67 * 75M ≈ 2,0 млрд` |
-| Поиск по галерее                |                                   **0,055** | Google сообщила, что более 370 млн пользователей ежемесячно выполняют поиск по своим фото. Для оценки количества запросов принимается одно поисковое действие на одного такого пользователя в месяц: `370M / 30 / 1,5B * 500M / 75M ≈ 0,055`. [[8](https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/)]                                                                                                                    |      `0,055 * 75M = 4,125M` |
-| Шеринг                          |                                   **0,066** | Google сообщила, что более 440 млн пользователей ежемесячно делятся своими воспоминаниями. Принимается одно действие шеринга на одного такого пользователя в месяц: `440M / 30 / 1,5B * 500M / 75M ≈ 0,066`. [[8](https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/)]                                                                                                                                                     |       `0,066 * 75M = 4,95M` |
+| Поиск по галерее                |                                   **0,055** | Google сообщила, что более 370 млн пользователей ежемесячно выполняют поиск по своим фото. Для оценки количества запросов принимается одно поисковое действие на одного такого пользователя в месяц: `370M / 30 / 1,5B * 500M / 75M ≈ 0,055`. [^8]                                                                                                                    |      `0,055 * 75M = 4,125M` |
+| Шеринг                          |                                   **0,066** | Google сообщила, что более 440 млн пользователей ежемесячно делятся своими воспоминаниями. Принимается одно действие шеринга на одного такого пользователя в месяц: `440M / 30 / 1,5B * 500M / 75M ≈ 0,066`. [^8]                                                                                                                                                     |       `0,066 * 75M = 4,95M` |
 | Создание совместного альбома    |                                   **0,010** | Открытых данных о частоте создания совместных альбомов нет, поэтому принимается сценарное допущение: **1% DAU создают совместный альбом в сутки**. `1% = 0,01` действия/DAU/день.                                                                                                                                                                                                                                                                                      |        `0,01 * 75M = 0,75M` |
 | Добавление в совместный альбом  |                                    **0,10** | При отсутствии открытых данных принимается: **10% DAU выполняют добавление в совместный альбом в сутки**. `10% = 0,10` действия/DAU/день.                                                                                                                                                                                                                                                                                                                              |         `0,10 * 75M = 7,5M` |
 | Просмотр совместного альбома    |                                    **0,20** | При отсутствии открытых данных принимается: **20% DAU выполняют просмотр совместного альбома в сутки**. `20% = 0,20` действия/DAU/день.                                                                                                                                                                                                                                                                                                                                |          `0,20 * 75M = 15M` |
 | Push-уведомления                |                                    **0,30** | При отсутствии открытых данных принимается: **30% DAU получают одно push-уведомление в сутки**. `30% = 0,30` уведомления/DAU/день.                                                                                                                                                                                                                                                                                                                                     |        `0,30 * 75M = 22,5M` |
-| **Итого**                       |                                  **≈56,15** |                                                                                                                                                                                                                                                                                                                                     |             **≈4,212 млрд** |
+| **Итого**                       |                                  **≈56,15** |                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |             **≈4,212 млрд** |
 
 Таким образом, в среднем один активный пользователь генерирует около **56 пользовательских/фоновых операций в сутки** в соответствии с принятой моделью. При 75 млн DAU это составляет примерно **4,21 млрд операций в сутки**.
 
@@ -59,9 +59,9 @@
 - бесплатный — **10 GB**;
 - платный — **200 GB**.
 
-Исследование All About Cookies показывает, что 62% опрошенных пользователей платят за облачное хранилище. [[4](https://allaboutcookies.org/cloud-storage-pricing)]
+Исследование All About Cookies показывает, что 62% опрошенных пользователей платят за облачное хранилище. [^4]
 
-Оценочная доля Google в размере **15–19% рынка personal cloud**. [[5](https://www.marketresearchfuture.com/reports/personal-cloud-market-7041)]
+Оценочная доля Google в размере **15–19% рынка personal cloud**. [^5]
 
 Для расчёта принимается 62% \* 17% = **10,5% платных пользователей**. Это рассматривается как отдельное инженерное допущение.
 
@@ -135,8 +135,7 @@
 | Служебный трафик                         |         **~44 Гбит/с** | `~22 Гбит/с * 2 ≈ 44 Гбит/с`                     |
 | API / поиск / авторизация                |        **~0,5 Гбит/с** | `~97 490 RPS * 0,64 KB * 8 ≈ 0,5 Гбит/с`         |
 | **ИТОГО пиково**                         |    **~1 979,5 Гбит/с** | `1 852 + 83 + 44 + 0,5 ≈ 1 979,5 Гбит/с`         |
-|                                          |      **≈ 1,98 Тбит/с** | |
-
+|                                          |      **≈ 1,98 Тбит/с** |                                                  |
 
 #### 2.3.2. RPS (средний / пиковый)
 
@@ -160,13 +159,14 @@
 | Face recognition      | **~23 148 / ~46 296** | `2 млрд / 86400`               |
 | **Итого**             | **~48 745 / ~97 490** |                                |
 
-
 ## Список источников
-1. Sabharwal A. 500 million people using Google Photos, and three new ways to share // Google. 17 May 2017. URL: https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing
-2. DAU/MAU Ratio (Stickiness): Definition, Formula & Benchmarks // IdeaPlan. 2024. URL: https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness
-3. Woolf M. 26+ Mobile Photography Statistics for 2026 // PhotoAiD. 2023, обновлено 9 Dec. 2025. URL: https://photoaid.com/blog/mobile-photography-statistics/ (дата обращения: 24.09.2026).
-4. Schafer D. Cloud Storage Pricing Guide: Compare Google One, iCloud, OneDrive, Dropbox, and More // All About Cookies. 24 June 2026. URL: https://allaboutcookies.org/cloud-storage-pricing
-5. Gupta A. Personal Cloud Market Size, Share & Trends [2035] // Market Research Future. 2026. URL: https://www.marketresearchfuture.com/reports/personal-cloud-market-7041
-6. Gracia-Tinedo R., Tian Y., Sampé J., Harkous H., Lenton J., García-López P., Sánchez-Artigas M., Vukolić M. Dissecting UbuntuOne: Autopsy of a Global-scale Personal Cloud Back-end // Proceedings of the 2015 Internet Measurement Conference. 2015. DOI: 10.1145/2815675.2815677. URL: https://www.researchgate.net/publication/282334268_Dissecting_UbuntuOne_Autopsy_of_a_Global-scale_Personal_Cloud_Back-end
-7. Selier J. Ask Photos: A new way to search your photos with Gemini // Google. 14 May 2024. URL: https://blog.google/products-and-platforms/products/photos/ask-photos-google-io-2024/
-8. Ben-Yair S. 10 tips for 10 years of Google Photos // Google. 28 May 2025. URL: https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/
+
+[^1]: Sabharwal A. 500 million people using Google Photos, and three new ways to share // Google. 17 May 2017. URL: https://blog.google/products-and-platforms/products/photos/google-photos-500-million-new-sharing
+[^2]: DAU/MAU Ratio (Stickiness): Definition, Formula & Benchmarks // IdeaPlan. 2024. URL: https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness
+
+[^3]: Woolf M. 26+ Mobile Photography Statistics for 2026 // PhotoAiD. 2023, обновлено 9 Dec. 2025. URL: https://photoaid.com/blog/mobile-photography-statistics/ (дата обращения: 24.09.2026).
+[^4]: Schafer D. Cloud Storage Pricing Guide: Compare Google One, iCloud, OneDrive, Dropbox, and More // All About Cookies. 24 June 2026. URL: https://allaboutcookies.org/cloud-storage-pricing
+[^5]: Gupta A. Personal Cloud Market Size, Share & Trends [2035] // Market Research Future. 2026. URL: https://www.marketresearchfuture.com/reports/personal-cloud-market-7041
+[^6]: Gracia-Tinedo R., Tian Y., Sampé J., Harkous H., Lenton J., García-López P., Sánchez-Artigas M., Vukolić M. Dissecting UbuntuOne: Autopsy of a Global-scale Personal Cloud Back-end // Proceedings of the 2015 Internet Measurement Conference. 2015. DOI: 10.1145/2815675.2815677. URL: https://www.researchgate.net/publication/282334268_Dissecting_UbuntuOne_Autopsy_of_a_Global-scale_Personal_Cloud_Back-end
+[^7]: Selier J. Ask Photos: A new way to search your photos with Gemini // Google. 14 May 2024. URL: https://blog.google/products-and-platforms/products/photos/ask-photos-google-io-2024/
+[^8]: Ben-Yair S. 10 tips for 10 years of Google Photos // Google. 28 May 2025. URL: https://blog.google/products-and-platforms/products/photos/google-photos-10-years-tips-tricks/
