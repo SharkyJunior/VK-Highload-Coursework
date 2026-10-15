@@ -683,6 +683,7 @@ erDiagram
         string user_id FK
         string role
         string joined_at
+        string updated_at
     }
 
     ALBUM_ITEMS {
@@ -690,6 +691,7 @@ erDiagram
         string photo_id FK
         string added_by FK
         string added_at
+        string updated_at
     }
 
     SHARES {
@@ -699,6 +701,7 @@ erDiagram
         string type
         string resource_id
         string expires_at
+        string updated_at
     }
 
     NOTIFICATIONS {
