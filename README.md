@@ -582,6 +582,8 @@ L7 = 347 + 42 = 389 серверов
 
 Расчёты нагрузки используют значения из раздела 2: около **4,1925 трлн фотографий**, средний размер файла **5 MB**, около **6 млрд загрузок/сутки**, **1,1925 млрд скачиваний/сутки**, **55,575 млн поисковых запросов/сутки**, **65,925 млн операций шеринга/сутки** и около **158 525 QPS** среднего пользовательского и фонового потока. Пиковая нагрузка принимается в 2 раза выше средней. Файловый контент при этом не проходит через основную БД: БД хранит метаданные и ссылку на объект, а байты файла обслуживаются файловым хранилищем/CDN.
 
+**Служебные поля.** Во всех долгоживущих сущностях есть `created_at`. Там, где строку можно изменить, добавлен `updated_at`. Там, где строку можно удалить или отозвать пользователем, добавлен `deleted_at` (логическое удаление: строка остаётся в «корзине» 30 суток и потом удаляется фоновой задачей). Для неизменяемых и производных данных (`media_objects`, `face_embeddings`) `updated_at` не нужен: они не редактируются, а пересоздаются. Для временных буферов достаточно `created_at` и срока жизни (`expires_at`, `next_retry_at`).
+
 ```mermaid
 erDiagram
 
@@ -624,6 +626,9 @@ erDiagram
         string user_id FK
         string token_hash
         string expires_at
+        string created_at
+        string updated_at
+        string deleted_at
     }
 
     PHOTOS {
@@ -631,6 +636,7 @@ erDiagram
         string owner_id FK
         string object_id FK
         string created_at
+        string updated_at
         string camera_model
         string latitude
         string longitude
@@ -643,6 +649,8 @@ erDiagram
         bigint size_bytes
         string checksum
         string mime_type
+        string created_at
+        string deleted_at
     }
 
     FACE_PROFILES {
@@ -650,6 +658,9 @@ erDiagram
         string user_id FK
         string person_label
         string cluster_id
+        string created_at
+        string updated_at
+        string deleted_at
     }
 
     FACE_EMBEDDINGS {
@@ -658,6 +669,7 @@ erDiagram
         string face_id FK
         string embedding
         string bounding_box
+        string created_at
     }
 
     FACE_JOBS {
@@ -684,6 +696,7 @@ erDiagram
         string role
         string joined_at
         string updated_at
+        string deleted_at
     }
 
     ALBUM_ITEMS {
@@ -692,6 +705,7 @@ erDiagram
         string added_by FK
         string added_at
         string updated_at
+        string deleted_at
     }
 
     SHARES {
@@ -701,7 +715,9 @@ erDiagram
         string type
         string resource_id
         string expires_at
+        string created_at
         string updated_at
+        string deleted_at
     }
 
     NOTIFICATIONS {
@@ -711,6 +727,7 @@ erDiagram
         string payload
         string read_at
         string created_at
+        string deleted_at
     }
 
     SEARCH_INDEX {
@@ -721,6 +738,7 @@ erDiagram
         string geo
         string face_id FK
         string search_text
+        string updated_at
     }
 
     UPLOAD_BUFFER {
@@ -728,6 +746,7 @@ erDiagram
         string user_id FK
         int chunk_number
         bigint size_bytes
+        string created_at
         string expires_at
     }
 
@@ -735,31 +754,32 @@ erDiagram
         string event_id PK
         string notification_id FK
         int attempts
+        string created_at
         string next_retry_at
     }
 ```
 
 ### 5.1. Основные сущности
 
-| Таблица               | Назначение                                       | Основные поля                                                                              |                                                    Оценка объёма | Чтение, QPS avg / peak | Запись, QPS avg / peak | Консистентность                                                           | Ключ распределения нагрузки                                                                          |
-| --------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------: | ---------------------: | ---------------------: | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `users`               | Учётные записи и настройки пользователя          | `user_id`, `email`, `home_region`, `created_at`                                            |                              **1,5 млрд строк × 256 B ≈ 384 GB** |      **2 839 / 5 677** |                  **—** | Сильная                                                                   | `user_id`; распределение близко к равномерному                                                       |
-| `sessions`            | Сессии авторизации                               | `session_id`, `user_id`, `token_hash`, `expires_at`                                        |                                    **1,5 млрд × 256 B ≈ 384 GB** |      **2 839 / 5 677** |      **2 839 / 5 677** | Сильная                                                                   | `session_id` для записи, `user_id` для проверки активных сессий                                      |
-| `photos`              | Метаинформация фотографии/видео                  | `photo_id`, `owner_id`, `object_id`, `created_at`, `camera_model`, `latitude`, `longitude` |                                **4,1925 трлн × 512 B ≈ 2,15 PB** |    **14 445 / 28 889** |   **69 444 / 138 889** | Сильная для ownership и commit; межрегиональные копии могут быть eventual | `photo_id` для объекта; логически основной доступ — `(owner_id, created_at, photo_id)`               |
-| `media_objects`       | Файловый объект оригинала                        | `object_id`, `photo_id`, `object_key`, `size_bytes`, `checksum`, `mime_type`               | **4,1925 трлн объектов; ~20,96 EB файлов + ≈0,54 PB метаданных** |    **13 802 / 27 604** |   **69 444 / 138 889** | Байты файла неизменяемы; commit объекта — сильный, репликация — eventual  | `object_id` / `object_key`; случайные идентификаторы для равномерных записей                         |
-| `face_profiles`       | Кластеры/идентичности лиц пользователя           | `face_id`, `user_id`, `person_label`, `cluster_id`                                         |                                 **≈15 млрд × 128 B ≈ 1,92 TB\*** |        **643 / 1 286** |   **69 444 / 138 889** | Eventual; строится асинхронно после загрузки                              | `user_id`, внутри пользователя — `face_id`                                                           |
-| `face_embeddings`     | Векторные признаки найденных лиц                 | `embedding_id`, `photo_id`, `face_id`, `vector`, `bbox`                                    |                              **≈4,1925 трлн × 2 KB ≈ 8,59 PB\*** |        **643 / 1 286** |   **69 444 / 138 889** | Eventual; результат фоновой обработки                                     | `photo_id` + `face_id`; поиск по лицу логически идёт через индекс                                    |
-| `albums`              | Совместные альбомы                               | `album_id`, `owner_id`, `title`, `created_at`                                              |                                 **≈150 млн × 256 B ≈ 38,4 GB\*** |       **≈781 / 1 563** |            **26 / 52** | Сильная                                                                   | `album_id`; создание равномерное по владельцам                                                       |
-| `album_members`       | Участники совместного альбома                    | `album_id`, `user_id`, `role`, `joined_at`                                                 |                                  **≈600 млн × 96 B ≈ 57,6 GB\*** |        **521 / 1 042** |          **260 / 521** | Сильная в рамках альбома                                                  | `album_id`; возможны hot-spot для очень популярных альбомов                                          |
-| `album_items`         | Фото внутри альбома                              | `album_id`, `photo_id`, `added_by`, `added_at`                                             |                               **≈209,6 млрд × 64 B ≈ 13,4 TB\*** |        **521 / 1 042** |          **260 / 521** | Сильная в рамках альбома                                                  | `(album_id, added_at, photo_id)`; чтение по альбому, записи особенно чувствительны к hot-spot        |
-| `shares`              | Права доступа и ссылки на общий ресурс           | `share_id`, `owner_id`, `resource_id`, `recipient_id`, `expires_at`                        |                                 **≈1,5 млрд × 256 B ≈ 384 GB\*** |        **763 / 1 526** |        **763 / 1 526** | Сильная для изменения прав; чтение после записи — read-after-write        | `share_id`; lookup также по `recipient_id`                                                           |
-| `notifications`       | История уведомлений                              | `notification_id`, `recipient_id`, `type`, `payload`, `read_at`                            |                               **≈2,025 млрд × 256 B ≈ 518 GB\*** |        **781 / 1 563** |        **781 / 1 563** | Eventual; допускаются дубликаты при повторной доставке                    | `recipient_id + created_at`; возможны hot-key для очень активного пользователя                       |
-| `search_index`        | Индекс поиска по дате, камере, геоданным и лицам | `owner_id`, `photo_id`, `date`, `camera`, `geo`, `face_id`, `terms`                        |                              **≈4,1925 трлн × 1 KB ≈ 4,29 PB\*** |        **643 / 1 286** |   **69 444 / 138 889** | Eventual; допустима небольшая задержка появления нового фото в поиске     | Важен `owner_id` в начале логического ключа; глобальные термы без owner-scoping могут создавать skew |
-| `face_jobs`           | Очередь и история задач распознавания            | `job_id`, `photo_id`, `status`, `attempts`, `created_at`                                   |               **42 млрд записей за 7 суток × 192 B ≈ 8,06 TB\*** |   **69 444 / 138 889** |   **69 444 / 138 889** | At-least-once; обработчики должны быть идемпотентными                     | `job_id`; чтение рабочих задач по статусу/времени                                                    |
-| `session_cache`       | Горячий кеш сессий                               | `session_id`, `user_id`, `expires_at`                                                      |                                 **≈1,5 млрд × 128 B ≈ 192 GB\*** |      **2 839 / 5 677** |      **2 839 / 5 677** | Eventual, TTL                                                             | `session_id`; равномерный random/hash key                                                            |
-| `metadata_cache`      | Горячий кеш метаданных фото                      | `photo_id`, `metadata_blob`, `ttl`                                                         |                       **≈41,9 млрд entries × 256 B ≈ 10,7 TB\*** |   **≈11 556 / 23 112** |     **≈2 889 / 5 778** | Eventual, TTL; источник истины — `photos`                                 | `photo_id`; равномерный hash key                                                                     |
-| `upload_buffer`       | Буфер незавершённых загрузок                     | `upload_id`, `chunk_no`, `bytes`, `expires_at`                                             |        **≈20,8 млн объектов в среднем при TTL 5 мин; ≈104 TB\*** |   **69 444 / 138 889** |   **69 444 / 138 889** | At-least-once; повторная запись чанка безопасна                           | `upload_id + chunk_no`; random `upload_id`                                                           |
-| `notification_buffer` | Буфер очереди push-уведомлений                   | `event_id`, `notification_id`, `attempts`, `next_retry_at`                                 |                   **≈2,81 млн сообщений при TTL 1 ч; ≈360 MB\*** |        **781 / 1 563** |        **781 / 1 563** | At-least-once; дедупликация по `event_id`                                 | `event_id`; равномерные random/hash key                                                              |
+| Таблица               | Назначение                                       | Основные поля                                                                                                          | Оценка объёма                                                    | Чтение, QPS avg / peak | Запись, QPS avg / peak | Консистентность                                                           | Ключ распределения нагрузки                                                                          |
+| --------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------- | ---------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `users`               | Учётные записи и настройки пользователя          | `user_id`, `email`, `home_region`, `created_at`, `updated_at`, `deleted_at`                                            | **1,5 млрд строк × 256 B ≈ 384 GB**                              | **2 839 / 5 677**      | **—**                  | Сильная                                                                   | `user_id`; распределение близко к равномерному                                                       |
+| `sessions`            | Сессии авторизации                               | `session_id`, `user_id`, `token_hash`, `expires_at`, `created_at`, `updated_at`, `deleted_at`                          | **1,5 млрд × 280 B ≈ 420 GB**                                    | **2 839 / 5 677**      | **2 839 / 5 677**      | Сильная                                                                   | `session_id` для записи, `user_id` для проверки активных сессий                                      |
+| `photos`              | Метаинформация фотографии/видео                  | `photo_id`, `owner_id`, `object_id`, `created_at`, `updated_at`, `deleted_at`, `camera_model`, `latitude`, `longitude` | **4,1925 трлн × 520 B ≈ 2,18 PB**                                | **14 445 / 28 889**    | **69 444 / 138 889**   | Сильная для ownership и commit; межрегиональные копии могут быть eventual | `photo_id` для объекта; логически основной доступ — `(owner_id, created_at, photo_id)`               |
+| `media_objects`       | Файловый объект оригинала                        | `object_id`, `object_key`, `size_bytes`, `checksum`, `mime_type`, `created_at`, `deleted_at`                           | **4,1925 трлн объектов; ~20,96 EB файлов + ≈0,54 PB метаданных** | **13 802 / 27 604**    | **69 444 / 138 889**   | Байты файла неизменяемы; commit объекта — сильный, репликация — eventual  | `object_id` / `object_key`; случайные идентификаторы для равномерных записей                         |
+| `face_profiles`       | Кластеры/идентичности лиц пользователя           | `face_id`, `user_id`, `person_label`, `cluster_id`, `created_at`, `updated_at`, `deleted_at`                           | **≈15 млрд × 152 B ≈ 2,28 TB\***                                 | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; строится асинхронно после загрузки                              | `user_id`, внутри пользователя — `face_id`                                                           |
+| `face_embeddings`     | Векторные признаки найденных лиц                 | `embedding_id`, `photo_id`, `face_id`, `vector`, `bbox`, `created_at`                                                  | **≈4,1925 трлн × 2 056 B ≈ 8,62 PB\***                           | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; результат фоновой обработки                                     | `photo_id` + `face_id`; поиск по лицу логически идёт через индекс                                    |
+| `albums`              | Совместные альбомы                               | `album_id`, `owner_id`, `title`, `created_at`, `updated_at`, `deleted_at`                                              | **≈150 млн × 256 B ≈ 38,4 GB\***                                 | **≈781 / 1 563**       | **26 / 52**            | Сильная                                                                   | `album_id`; создание равномерное по владельцам                                                       |
+| `album_members`       | Участники совместного альбома                    | `album_id`, `user_id`, `role`, `joined_at`, `updated_at`, `deleted_at`                                                 | **≈600 млн × 104 B ≈ 62,4 GB\***                                 | **521 / 1 042**        | **260 / 521**          | Сильная в рамках альбома                                                  | `album_id`; возможны hot-spot для очень популярных альбомов                                          |
+| `album_items`         | Фото внутри альбома                              | `album_id`, `photo_id`, `added_by`, `added_at`, `updated_at`, `deleted_at`                                             | **≈209,6 млрд × 72 B ≈ 15,1 TB\***                               | **521 / 1 042**        | **260 / 521**          | Сильная в рамках альбома                                                  | `(album_id, added_at, photo_id)`; чтение по альбому, записи особенно чувствительны к hot-spot        |
+| `shares`              | Права доступа и ссылки на общий ресурс           | `share_id`, `owner_id`, `resource_id`, `recipient_id`, `expires_at`, `created_at`, `updated_at`, `deleted_at`          | **≈1,5 млрд × 272 B ≈ 408 GB\***                                 | **763 / 1 526**        | **763 / 1 526**        | Сильная для изменения прав; чтение после записи — read-after-write        | `share_id`; lookup также по `recipient_id`                                                           |
+| `notifications`       | История уведомлений                              | `notification_id`, `recipient_id`, `type`, `payload`, `read_at`, `created_at`, `deleted_at`                            | **≈2,025 млрд × 264 B ≈ 535 GB\***                               | **781 / 1 563**        | **781 / 1 563**        | Eventual; допускаются дубликаты при повторной доставке                    | `recipient_id + created_at`; возможны hot-key для очень активного пользователя                       |
+| `search_index`        | Индекс поиска по дате, камере, геоданным и лицам | `owner_id`, `photo_id`, `date`, `camera`, `geo`, `face_id`, `terms`, `updated_at`                                      | **≈4,1925 трлн × 1 032 B ≈ 4,33 PB\***                           | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; допустима небольшая задержка появления нового фото в поиске     | Важен `owner_id` в начале логического ключа; глобальные термы без owner-scoping могут создавать skew |
+| `face_jobs`           | Очередь и история задач распознавания            | `job_id`, `photo_id`, `status`, `attempts`, `created_at`, `updated_at`                                                 | **42 млрд записей за 7 суток × 192 B ≈ 8,06 TB\***               | **69 444 / 138 889**   | **69 444 / 138 889**   | At-least-once; обработчики должны быть идемпотентными                     | `job_id`; чтение рабочих задач по статусу/времени                                                    |
+| `session_cache`       | Горячий кеш сессий                               | `session_id`, `user_id`, `expires_at`                                                                                  | **≈1,5 млрд × 128 B ≈ 192 GB\***                                 | **2 839 / 5 677**      | **2 839 / 5 677**      | Eventual, TTL                                                             | `session_id`; равномерный random/hash key                                                            |
+| `metadata_cache`      | Горячий кеш метаданных фото                      | `photo_id`, `metadata_blob`, `ttl`                                                                                     | **≈41,9 млрд entries × 256 B ≈ 10,7 TB\***                       | **≈11 556 / 23 112**   | **≈2 889 / 5 778**     | Eventual, TTL; источник истины — `photos`                                 | `photo_id`; равномерный hash key                                                                     |
+| `upload_buffer`       | Буфер незавершённых загрузок                     | `upload_id`, `chunk_no`, `bytes`, `created_at`, `expires_at`                                                           | **≈20,8 млн объектов в среднем при TTL 5 мин; ≈104 TB\***        | **69 444 / 138 889**   | **69 444 / 138 889**   | At-least-once; повторная запись чанка безопасна                           | `upload_id + chunk_no`; random `upload_id`                                                           |
+| `notification_buffer` | Буфер очереди push-уведомлений                   | `event_id`, `notification_id`, `attempts`, `created_at`, `next_retry_at`                                               | **≈2,81 млн сообщений при TTL 1 ч × 136 B ≈ 383 MB\***           | **781 / 1 563**        | **781 / 1 563**        | At-least-once; дедупликация по `event_id`                                 | `event_id`; равномерные random/hash key                                                              |
 
 > **Все QPS в таблице — средние и пиковые. Пик = 2 × среднее**, в соответствии с моделью раздела 2. Значения относятся к логическим операциям над сущностью, поэтому фактическое число физических операций конкретной СУБД может быть выше из-за индексов, журналирования, репликации и фоновых процессов.
 
