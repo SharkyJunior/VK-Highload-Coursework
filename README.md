@@ -586,7 +586,6 @@ L7 = 347 + 42 = 389 серверов
 
 ```mermaid
 erDiagram
-
     USERS ||--o{ SESSIONS : has
     USERS ||--o{ PHOTOS : owns
     PHOTOS ||--|| MEDIA_OBJECTS : stored_as
@@ -604,7 +603,6 @@ erDiagram
 
     USERS ||--o{ SHARES : creates
     USERS ||--o{ SHARES : receives
-
     USERS ||--o{ NOTIFICATIONS : receives
 
     PHOTOS ||--o{ SEARCH_INDEX : indexed
@@ -613,177 +611,220 @@ erDiagram
     NOTIFICATIONS ||--o{ NOTIFICATION_BUFFER : queued
 
     USERS {
-        string user_id PK
+        uuid user_id PK
         string email
         string home_region
-        string created_at
-        string updated_at
-        string deleted_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     SESSIONS {
-        string session_id PK
-        string user_id FK
-        string token_hash
-        string expires_at
-        string created_at
-        string updated_at
-        string deleted_at
+        uuid session_id PK
+        uuid user_id FK
+        binary token_hash
+        timestamp expires_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     PHOTOS {
-        string photo_id PK
-        string owner_id FK
-        string object_id FK
-        string created_at
-        string updated_at
+        uuid photo_id PK
+        uuid owner_id FK
+        uuid object_id FK
+        timestamp created_at
+        timestamp updated_at
         string camera_model
-        string latitude
-        string longitude
-        string deleted_at
+        float latitude
+        float longitude
+        timestamp deleted_at
     }
 
     MEDIA_OBJECTS {
-        string object_id PK
+        uuid object_id PK
         string object_key
         bigint size_bytes
-        string checksum
+        binary checksum
         string mime_type
-        string created_at
-        string deleted_at
+        timestamp created_at
+        timestamp deleted_at
     }
 
     FACE_PROFILES {
-        string face_id PK
-        string user_id FK
+        uuid face_id PK
+        uuid user_id FK
         string person_label
-        string cluster_id
-        string created_at
-        string updated_at
-        string deleted_at
+        uuid cluster_id
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     FACE_EMBEDDINGS {
-        string embedding_id PK
-        string photo_id FK
-        string face_id FK
-        string embedding
-        string bounding_box
-        string created_at
+        uuid embedding_id PK
+        uuid photo_id FK
+        uuid face_id FK
+        binary embedding
+        binary bounding_box
+        timestamp created_at
     }
 
     FACE_JOBS {
-        string job_id PK
-        string photo_id FK
-        string status
+        uuid job_id PK
+        uuid photo_id FK
+        smallint status
         int attempts
-        string created_at
-        string updated_at
+        timestamp created_at
+        timestamp updated_at
     }
 
     ALBUMS {
-        string album_id PK
-        string owner_id FK
+        uuid album_id PK
+        uuid owner_id FK
         string title
-        string created_at
-        string updated_at
-        string deleted_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     ALBUM_MEMBERS {
-        string album_id FK
-        string user_id FK
-        string role
-        string joined_at
-        string updated_at
-        string deleted_at
+        uuid album_id FK
+        uuid user_id FK
+        smallint role
+        timestamp joined_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     ALBUM_ITEMS {
-        string album_id FK
-        string photo_id FK
-        string added_by FK
-        string added_at
-        string updated_at
-        string deleted_at
+        uuid album_id FK
+        uuid photo_id FK
+        uuid added_by FK
+        timestamp added_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     SHARES {
-        string share_id PK
-        string owner_id FK
-        string recipient_id FK
-        string type
-        string resource_id
-        string expires_at
-        string created_at
-        string updated_at
-        string deleted_at
+        uuid share_id PK
+        uuid owner_id FK
+        uuid recipient_id FK
+        smallint type
+        uuid resource_id
+        timestamp expires_at
+        timestamp created_at
+        timestamp updated_at
+        timestamp deleted_at
     }
 
     NOTIFICATIONS {
-        string notification_id PK
-        string recipient_id FK
-        string notification_type
+        uuid notification_id PK
+        uuid recipient_id FK
+        smallint notification_type
         string payload
-        string read_at
-        string created_at
-        string deleted_at
+        timestamp read_at
+        timestamp created_at
+        timestamp deleted_at
     }
 
     SEARCH_INDEX {
-        string photo_id FK
-        string owner_id FK
-        string date
+        uuid photo_id FK
+        uuid owner_id FK
+        timestamp date
         string camera
-        string geo
-        string face_id FK
+        binary geo
+        uuid face_id FK
         string search_text
-        string updated_at
+        timestamp updated_at
     }
 
     UPLOAD_BUFFER {
-        string upload_id PK
-        string user_id FK
+        uuid upload_id PK
+        uuid user_id FK
         int chunk_number
         bigint size_bytes
-        string created_at
-        string expires_at
+        timestamp created_at
+        timestamp expires_at
     }
 
     NOTIFICATION_BUFFER {
-        string event_id PK
-        string notification_id FK
+        uuid event_id PK
+        uuid notification_id FK
         int attempts
-        string created_at
-        string next_retry_at
+        timestamp created_at
+        timestamp next_retry_at
     }
 ```
 
 ### 5.1. Основные сущности
 
-| Таблица               | Назначение                                       | Основные поля                                                                                                          | Оценка объёма                                                    | Чтение, QPS avg / peak | Запись, QPS avg / peak | Консистентность                                                           | Ключ распределения нагрузки                                                                          |
-| --------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------- | ---------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `users`               | Учётные записи и настройки пользователя          | `user_id`, `email`, `home_region`, `created_at`, `updated_at`, `deleted_at`                                            | **1,5 млрд строк × 256 B ≈ 384 GB**                              | **2 839 / 5 677**      | **—**                  | Сильная                                                                   | `user_id`; распределение близко к равномерному                                                       |
-| `sessions`            | Сессии авторизации                               | `session_id`, `user_id`, `token_hash`, `expires_at`, `created_at`, `updated_at`, `deleted_at`                          | **1,5 млрд × 280 B ≈ 420 GB**                                    | **2 839 / 5 677**      | **2 839 / 5 677**      | Сильная                                                                   | `session_id` для записи, `user_id` для проверки активных сессий                                      |
-| `photos`              | Метаинформация фотографии/видео                  | `photo_id`, `owner_id`, `object_id`, `created_at`, `updated_at`, `deleted_at`, `camera_model`, `latitude`, `longitude` | **4,1925 трлн × 520 B ≈ 2,18 PB**                                | **14 445 / 28 889**    | **69 444 / 138 889**   | Сильная для ownership и commit; межрегиональные копии могут быть eventual | `photo_id` для объекта; логически основной доступ — `(owner_id, created_at, photo_id)`               |
-| `media_objects`       | Файловый объект оригинала                        | `object_id`, `object_key`, `size_bytes`, `checksum`, `mime_type`, `created_at`, `deleted_at`                           | **4,1925 трлн объектов; ~20,96 EB файлов + ≈0,54 PB метаданных** | **13 802 / 27 604**    | **69 444 / 138 889**   | Байты файла неизменяемы; commit объекта — сильный, репликация — eventual  | `object_id` / `object_key`; случайные идентификаторы для равномерных записей                         |
-| `face_profiles`       | Кластеры/идентичности лиц пользователя           | `face_id`, `user_id`, `person_label`, `cluster_id`, `created_at`, `updated_at`, `deleted_at`                           | **≈15 млрд × 152 B ≈ 2,28 TB\***                                 | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; строится асинхронно после загрузки                              | `user_id`, внутри пользователя — `face_id`                                                           |
-| `face_embeddings`     | Векторные признаки найденных лиц                 | `embedding_id`, `photo_id`, `face_id`, `vector`, `bbox`, `created_at`                                                  | **≈4,1925 трлн × 2 056 B ≈ 8,62 PB\***                           | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; результат фоновой обработки                                     | `photo_id` + `face_id`; поиск по лицу логически идёт через индекс                                    |
-| `albums`              | Совместные альбомы                               | `album_id`, `owner_id`, `title`, `created_at`, `updated_at`, `deleted_at`                                              | **≈150 млн × 256 B ≈ 38,4 GB\***                                 | **≈781 / 1 563**       | **26 / 52**            | Сильная                                                                   | `album_id`; создание равномерное по владельцам                                                       |
-| `album_members`       | Участники совместного альбома                    | `album_id`, `user_id`, `role`, `joined_at`, `updated_at`, `deleted_at`                                                 | **≈600 млн × 104 B ≈ 62,4 GB\***                                 | **521 / 1 042**        | **260 / 521**          | Сильная в рамках альбома                                                  | `album_id`; возможны hot-spot для очень популярных альбомов                                          |
-| `album_items`         | Фото внутри альбома                              | `album_id`, `photo_id`, `added_by`, `added_at`, `updated_at`, `deleted_at`                                             | **≈209,6 млрд × 72 B ≈ 15,1 TB\***                               | **521 / 1 042**        | **260 / 521**          | Сильная в рамках альбома                                                  | `(album_id, added_at, photo_id)`; чтение по альбому, записи особенно чувствительны к hot-spot        |
-| `shares`              | Права доступа и ссылки на общий ресурс           | `share_id`, `owner_id`, `resource_id`, `recipient_id`, `expires_at`, `created_at`, `updated_at`, `deleted_at`          | **≈1,5 млрд × 272 B ≈ 408 GB\***                                 | **763 / 1 526**        | **763 / 1 526**        | Сильная для изменения прав; чтение после записи — read-after-write        | `share_id`; lookup также по `recipient_id`                                                           |
-| `notifications`       | История уведомлений                              | `notification_id`, `recipient_id`, `type`, `payload`, `read_at`, `created_at`, `deleted_at`                            | **≈2,025 млрд × 264 B ≈ 535 GB\***                               | **781 / 1 563**        | **781 / 1 563**        | Eventual; допускаются дубликаты при повторной доставке                    | `recipient_id + created_at`; возможны hot-key для очень активного пользователя                       |
-| `search_index`        | Индекс поиска по дате, камере, геоданным и лицам | `owner_id`, `photo_id`, `date`, `camera`, `geo`, `face_id`, `terms`, `updated_at`                                      | **≈4,1925 трлн × 1 032 B ≈ 4,33 PB\***                           | **643 / 1 286**        | **69 444 / 138 889**   | Eventual; допустима небольшая задержка появления нового фото в поиске     | Важен `owner_id` в начале логического ключа; глобальные термы без owner-scoping могут создавать skew |
-| `face_jobs`           | Очередь и история задач распознавания            | `job_id`, `photo_id`, `status`, `attempts`, `created_at`, `updated_at`                                                 | **42 млрд записей за 7 суток × 192 B ≈ 8,06 TB\***               | **69 444 / 138 889**   | **69 444 / 138 889**   | At-least-once; обработчики должны быть идемпотентными                     | `job_id`; чтение рабочих задач по статусу/времени                                                    |
-| `session_cache`       | Горячий кеш сессий                               | `session_id`, `user_id`, `expires_at`                                                                                  | **≈1,5 млрд × 128 B ≈ 192 GB\***                                 | **2 839 / 5 677**      | **2 839 / 5 677**      | Eventual, TTL                                                             | `session_id`; равномерный random/hash key                                                            |
-| `metadata_cache`      | Горячий кеш метаданных фото                      | `photo_id`, `metadata_blob`, `ttl`                                                                                     | **≈41,9 млрд entries × 256 B ≈ 10,7 TB\***                       | **≈11 556 / 23 112**   | **≈2 889 / 5 778**     | Eventual, TTL; источник истины — `photos`                                 | `photo_id`; равномерный hash key                                                                     |
-| `upload_buffer`       | Буфер незавершённых загрузок                     | `upload_id`, `chunk_no`, `bytes`, `created_at`, `expires_at`                                                           | **≈20,8 млн объектов в среднем при TTL 5 мин; ≈104 TB\***        | **69 444 / 138 889**   | **69 444 / 138 889**   | At-least-once; повторная запись чанка безопасна                           | `upload_id + chunk_no`; random `upload_id`                                                           |
-| `notification_buffer` | Буфер очереди push-уведомлений                   | `event_id`, `notification_id`, `attempts`, `created_at`, `next_retry_at`                                               | **≈2,81 млн сообщений при TTL 1 ч × 136 B ≈ 383 MB\***           | **781 / 1 563**        | **781 / 1 563**        | At-least-once; дедупликация по `event_id`                                 | `event_id`; равномерные random/hash key                                                              |
+##### 5.1.1. Допущения по размерам полей
+
+Размер каждой записи рассчитывается как сумма размеров её полей и условных накладных расходов на структуру записи.
+
+| Тип поля                                    | Принятый размер | Обоснование                                       |
+| ------------------------------------------- | --------------: | ------------------------------------------------- |
+| UUID, внешний ключ FK                       |            16 B | Бинарный идентификатор длиной 128 бит             |
+| `TIMESTAMP`                                 |             8 B | 64-битное представление временной метки           |
+| `BIGINT`                                    |             8 B | 64-битное целое число                             |
+| `INT`                                       |             4 B | 32-битное целое число                             |
+| `SMALLINT`                                  |             2 B | Компактное представление статуса или перечисления |
+| `FLOAT64`                                   |             8 B | Число с плавающей точкой двойной точности         |
+| SHA-256 checksum                            |            32 B | Бинарный хеш размером 256 бит                     |
+| Вектор лица: 512 × `FLOAT32`                |         2 048 B | 512 чисел по 4 байта                              |
+| Bounding box лица                           |            16 B | Четыре координаты по 4 байта                      |
+| `email`                                     |            42 B | 40 B содержимого и 2 B на длину                   |
+| `home_region`                               |            18 B | 16 B содержимого и 2 B на длину                   |
+| `camera_model`                              |            42 B | 40 B содержимого и 2 B на длину                   |
+| `person_label`                              |            34 B | 32 B содержимого и 2 B на длину                   |
+| `title` альбома                             |            66 B | 64 B содержимого и 2 B на длину                   |
+| `object_key`                                |            66 B | 64 B содержимого и 2 B на длину                   |
+| `mime_type`                                 |            26 B | 24 B содержимого и 2 B на длину                   |
+| `search_text`                               |           514 B | 512 B содержимого и 2 B на длину                  |
+| `notification.payload`                      |           130 B | 128 B содержимого и 2 B на длину                  |
+| `metadata_blob` в кеше                      |           256 B | Принятый средний размер блока метаданных          |
+| `token_hash`                                |            32 B | Бинарный хеш токена                               |
+| `resource_id`, `cluster_id`                 |            16 B | Предполагается бинарный UUID                      |
+| Координаты `latitude`, `longitude`          |      8 B каждое | Два поля `FLOAT64`                                |
+| Геоданные `geo`                             |            16 B | Две координаты `FLOAT64`                          |
+| `payload` и текстовые поля переменной длины |      По таблице | Используется средний размер содержимого           |
+
+Размеры строк — инженерные допущения, а не ограничения максимальной длины. Предполагается, что строки хранятся в UTF-8, а их средний размер соответствует приведённым значениям. Для компактных статусов, ролей и типов предполагается числовое представление, а не текстовые названия.
+
+Для каждой записи дополнительно учитывается **24 B** условных накладных расходов на структуру записи, выравнивание и информацию о nullable-полях. Это упрощённая оценка, поскольку реальные расходы зависят от СУБД и её формата хранения.
+
+В расчётах используются десятичные единицы: 1 GB = \(10^9\) B, 1 TB = \(10^{12}\) B, 1 PB = \(10^{15}\) B и 1 EB = \(10^{18}\) B.
+
+Полученные значения отражают расчётный объём записей, включая принятые накладные расходы на запись. Вторичные индексы, журналы транзакций, физическая репликация, свободный резерв СУБД и служебные структуры конкретного движка не включены. Для кешей и буферов применяется аналогичная оценка размера записей, но фактический расход памяти или диска может быть выше.
+
+#### 5.1.2. Оценка размеров хранилища
+
+| Таблица               | Назначение                                       | Основные поля                                                                                                          |                                   Оценка объёма | Чтение, QPS avg / peak | Запись, QPS avg / peak | Консистентность                                                           | Ключ распределения нагрузки                                                  |
+| --------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------: | ---------------------: | ---------------------: | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `users`               | Учётные записи и настройки пользователя          | `user_id`, `email`, `home_region`, `created_at`, `updated_at`, `deleted_at`                                            |                   1,5 млрд × 124 B ≈ **186 GB** |          2 839 / 5 677 |                      — | Сильная                                                                   | `user_id`; распределение близко к равномерному                               |
+| `sessions`            | Сессии авторизации                               | `session_id`, `user_id`, `token_hash`, `expires_at`, `created_at`, `updated_at`, `deleted_at`                          |                   1,5 млрд × 120 B ≈ **180 GB** |          2 839 / 5 677 |          2 839 / 5 677 | Сильная                                                                   | `session_id` для записи, `user_id` для проверки активных сессий              |
+| `photos`              | Метаданные фотографии или видео                  | `photo_id`, `owner_id`, `object_id`, `created_at`, `updated_at`, `deleted_at`, `camera_model`, `latitude`, `longitude` |             4,1925 трлн × 154 B ≈ **645,65 TB** |        14 445 / 28 889 |       69 444 / 138 889 | Сильная для ownership и commit; межрегиональные копии могут быть eventual | `photo_id`; логический доступ — `(owner_id, created_at, photo_id)`           |
+| `media_objects`       | Метаданные файлового объекта                     | `object_id`, `object_key`, `size_bytes`, `checksum`, `mime_type`, `created_at`, `deleted_at`                           |             4,1925 трлн × 188 B ≈ **788,19 TB** |        13 802 / 27 604 |       69 444 / 138 889 | Бинарный объект неизменяем; репликация — eventual                         | `object_id` / `object_key`; случайные идентификаторы для равномерных записей |
+| `face_profiles`       | Кластеры и идентичности лиц пользователя         | `face_id`, `user_id`, `person_label`, `cluster_id`, `created_at`, `updated_at`, `deleted_at`                           |                  ≈15 млрд × 130 B ≈ **1,95 TB** |            643 / 1 286 |       69 444 / 138 889 | Eventual; строится асинхронно после загрузки                              | `user_id`, внутри пользователя — `face_id`                                   |
+| `face_embeddings`     | Векторные признаки найденных лиц                 | `embedding_id`, `photo_id`, `face_id`, `embedding`, `bounding_box`, `created_at`                                       |            ≈4,1925 трлн × 2 144 B ≈ **8,99 PB** |            643 / 1 286 |       69 444 / 138 889 | Eventual; результат фоновой обработки                                     | `photo_id` + `face_id`; поиск по лицу идёт через индекс                      |
+| `albums`              | Совместные альбомы                               | `album_id`, `owner_id`, `title`, `created_at`, `updated_at`, `deleted_at`                                              |                  ≈150 млн × 146 B ≈ **21,9 GB** |            781 / 1 563 |                26 / 52 | Сильная                                                                   | `album_id`; создание распределяется по владельцам                            |
+| `album_members`       | Участники совместного альбома                    | `album_id`, `user_id`, `role`, `joined_at`, `updated_at`, `deleted_at`                                                 |                   ≈600 млн × 82 B ≈ **49,2 GB** |            521 / 1 042 |              260 / 521 | Сильная в рамках альбома                                                  | `album_id`; возможны hot-spot для популярных альбомов                        |
+| `album_items`         | Фотографии внутри альбома                        | `album_id`, `photo_id`, `added_by`, `added_at`, `updated_at`, `deleted_at`                                             |             ≈209,625 млрд × 96 B ≈ **20,12 TB** |            521 / 1 042 |              260 / 521 | Сильная в рамках альбома                                                  | `(album_id, added_at, photo_id)`; возможны hot-spot                          |
+| `shares`              | Права доступа и ссылки на общие ресурсы          | `share_id`, `owner_id`, `resource_id`, `recipient_id`, `expires_at`, `created_at`, `updated_at`, `deleted_at`          |                  ≈1,5 млрд × 122 B ≈ **183 GB** |            763 / 1 526 |            763 / 1 526 | Сильная для изменения прав; read-after-write                              | `share_id`; lookup также по `recipient_id`                                   |
+| `notifications`       | История уведомлений                              | `notification_id`, `recipient_id`, `type`, `payload`, `read_at`, `created_at`, `deleted_at`                            |              ≈2,025 млрд × 212 B ≈ **429,3 GB** |            781 / 1 563 |            781 / 1 563 | Eventual; возможны дубликаты доставки                                     | `recipient_id + created_at`; возможны hot-key                                |
+| `search_index`        | Индекс поиска по дате, камере, геоданным и лицам | `owner_id`, `photo_id`, `date`, `camera`, `geo`, `face_id`, `search_text`, `updated_at`                                |              ≈4,1925 трлн × 660 B ≈ **2,77 PB** |            643 / 1 286 |       69 444 / 138 889 | Eventual; допустима задержка появления нового фото                        | `owner_id` в начале логического ключа                                        |
+| `face_jobs`           | Очередь и история задач распознавания            | `job_id`, `photo_id`, `status`, `attempts`, `created_at`, `updated_at`                                                 | 42 млрд записей за 7 суток × 78 B ≈ **3,28 TB** |       69 444 / 138 889 |       69 444 / 138 889 | At-least-once; обработчики должны быть идемпотентными                     | `job_id`; рабочая выборка по статусу и времени                               |
+| `session_cache`       | Горячий кеш сессий                               | `session_id`, `user_id`, `expires_at`                                                                                  |                    ≈1,5 млрд × 64 B ≈ **96 GB** |          2 839 / 5 677 |          2 839 / 5 677 | Eventual, TTL                                                             | `session_id`; равномерный random/hash key                                    |
+| `metadata_cache`      | Горячий кеш метаданных фотографий                | `photo_id`, `metadata_blob`, `ttl`                                                                                     |             ≈41,925 млрд × 304 B ≈ **12,75 TB** |       ≈11 556 / 23 112 |         ≈2 889 / 5 778 | Eventual, TTL; источник истины — `photos`                                 | `photo_id`; равномерный hash key                                             |
+| `upload_buffer`       | Метаданные незавершённых загрузок                | `upload_id`, `user_id`, `chunk_no`, `bytes`, `created_at`, `expires_at`                                                |         ≈20,83 млн записей × 84 B ≈ **1,75 GB** |       69 444 / 138 889 |       69 444 / 138 889 | At-least-once; повторная запись чанка безопасна                           | `upload_id + chunk_no`; случайный `upload_id`                                |
+| `notification_buffer` | Буфер очереди push-уведомлений                   | `event_id`, `notification_id`, `attempts`, `created_at`, `next_retry_at`                                               |              ≈2,8125 млн × 76 B ≈ **213,75 MB** |            781 / 1 563 |            781 / 1 563 | At-least-once; дедупликация по `event_id`                                 | `event_id`; равномерные random/hash key                                      |
 
 > **Все QPS в таблице — средние и пиковые. Пик = 2 × среднее**, в соответствии с моделью раздела 2. Значения относятся к логическим операциям над сущностью, поэтому фактическое число физических операций конкретной СУБД может быть выше из-за индексов, журналирования, репликации и фоновых процессов.
 
 > **\*** Там, где раздел 2 не содержит прямой продуктовой метрики, используются отдельные инженерные допущения: 10 лицевых профилей на пользователя; одно сохраняемое face-embedding на фотографию; 0,1 совместного альбома на MAU; в среднем 4 участника альбома; 5% фотографий попадают в совместные альбомы; одна сохранённая share-запись на пользователя; хранение уведомлений 30 суток; история face-job 7 суток; кеширование 1% самых горячих фотографий; попадание в metadata cache около 80%; TTL upload buffer 5 минут; TTL notification buffer 1 час. Эти допущения нужны только для оценки размера сущностей и не изменяют исходные продуктовые нагрузки раздела 2.
+
+> Размер `face_embeddings` рассчитан для одного вектора на фотографию. Если на одной фотографии обнаруживается несколько лиц, объём будет выше. Для `face_profiles` принято около 15 млрд профилей, исходя из 10 профилей на пользователя.
 
 ### 5.2. Файловые данные
 
@@ -807,15 +848,45 @@ erDiagram
 
 ### 5.3. Кеши и буферы
 
-Кеши и буферы являются частью логической схемы, хотя физически могут быть реализованы отдельными системами хранения. Их задача — убрать из основной БД горячие чтения и временные состояния.
+Кеши и буферы являются частью логической схемы, хотя физически могут быть реализованы отдельными системами хранения. Их задача — уменьшить количество обращений к основной БД и хранить временное состояние незавершённых операций.
 
-`session_cache` содержит часто запрашиваемые сведения о сессиях. При auth-нагрузке около **2 839 QPS в среднем** и 2× пике кеш уменьшает количество обращений к постоянному хранилищу.
+`session_cache` содержит идентификатор сессии, пользователя и время истечения срока действия. При 1,5 млрд записей и расчётном размере 64 B логический объём составляет около **96 GB**. Фактический расход оперативной памяти зависит от реализации кеша и её служебных структур.
 
-`metadata_cache` содержит часто используемые метаданные фотографий. Для оценки принято кешировать около 1% фотографий; при предположении 80% попаданий суммарная нагрузка кеша составляет около **11,6k read QPS** в среднем. Кеш не является источником истины: при истечении TTL или промахе данные читаются из `photos`.
+`metadata_cache` содержит идентификатор фотографии, блок метаданных и TTL. При допущении о кешировании 1% фотографий получается около 41,925 млрд записей. При размере 304 B на запись расчётный объём составляет около **12,75 TB**. Источником истины остаётся таблица `photos`: при промахе кеша или истечении TTL данные читаются из постоянного хранилища.
 
-`upload_buffer` хранит незавершённые загрузки и отдельные чанки. При 6 млрд загрузок в сутки средняя скорость составляет около **69,4k upload/s**. При TTL 5 минут средний объём незавершённых данных оценивается примерно в **104 TB**, а при пике 2× — примерно в **208 TB**. После успешной фиксации файла буфер очищается.
+`upload_buffer` хранит состояние незавершённых загрузок и информацию об отдельных чанках. При 6 млрд загрузок в сутки и TTL 5 минут среднее число одновременно активных загрузок оценивается как:
 
-`notification_buffer` используется для повторной доставки push-уведомлений. При 67,5 млн уведомлений в сутки это около **781 сообщений/s** в среднем. При TTL 1 час одновременно в буфере находится около **2,8 млн событий**.
+```text
+6 млрд / 86400 × 300 ≈ 20,83 млн загрузок
+```
+
+Для метаданных одной незавершённой загрузки принимается размер 84 B:
+
+```text
+20,83 млн × 84 B ≈ 1,75 GB
+```
+
+Это только метаданные. Если предположить, что для каждой активной загрузки временно хранится в среднем 5 MB данных, объём временного бинарного контента составит:
+
+```text
+20,83 млн × 5 MB ≈ 104 TB
+```
+
+При двукратном пике соответствующая оценка возрастает примерно до **208 TB временного бинарного контента** и **3,5 GB метаданных загрузок**. Бинарные чанки предполагается хранить в отдельном временном файловом или объектном хранилище, а не в строках основной БД.
+
+`notification_buffer` используется для повторной доставки push-уведомлений. При 67,5 млн уведомлений в сутки и TTL 1 час среднее количество событий в буфере составляет:
+
+```text
+67,5 млн / 86400 × 3600 ≈ 2,8125 млн событий
+```
+
+При расчётном размере одной записи 76 B логический объём метаданных очереди составляет:
+
+```text
+2,8125 млн × 76 B ≈ 213,75 MB
+```
+
+Фактический объём очереди может быть выше из-за служебных структур брокера, индексов, повторных доставок и задержек обработки.
 
 ### 5.4. Требования к консистентности
 
@@ -890,91 +961,91 @@ flowchart LR
 
 ### 6.2. Описание таблиц и выбор СУБД
 
-| Таблица | Хранилище | Почему |
-| --- | --- | --- |
-| `users` | PostgreSQL «auth» | 384 GB, записей почти нет, нужны сильная консистентность и уникальность `email` |
-| `sessions` | PostgreSQL «auth» | Отзыв сессии должен действовать сразу; 5,7k write QPS в пике выдерживает один primary, горячие чтения берёт `session_cache` |
-| `photos` (+ `media_objects`) | Cassandra «meta» | 2,7 PB, 139k write QPS в пике; главный запрос — диапазон по `(owner_id, year, created_at)`; `LOCAL_QUORUM` даёт сильную консистентность в home-DC, межрегиональные копии асинхронны |
-| `face_profiles` | Cassandra «meta» | Много записей (139k QPS в пике), eventual-консистентность, чтение по `user_id` |
-| `face_embeddings` | Cassandra «ml» | 8,6 PB, запись 139k QPS, чтение 1,3k QPS; отдельный кластер, чтобы фоновая запись не мешала чтению галереи |
-| `albums`, `album_members`, `album_items` | PostgreSQL «social» | Сильная консистентность внутри альбома: все три таблицы в одном шарде (ключ `album_id`) и меняются одной транзакцией |
-| `shares` | PostgreSQL «social» | Изменение прав требует сильной консистентности и read-after-write |
-| `user_access` | PostgreSQL «social» | Денормализованный список «что доступно пользователю» (п. 6.5) |
-| `notifications` | Cassandra «meta» | Выборка последних по `recipient_id`, TTL 30 суток встроен в СУБД, eventual-консистентность |
-| `search_index` | Cassandra «meta» | 4,3 PB, 139k write QPS; любой запрос ограничен одним `owner_id`, то есть одной партицией, фильтры закрывают SAI-индексы. Поисковых движков в стеке лекции нет |
-| `face_jobs` | Kafka | Поток 69k msg/s (139k в пике), at-least-once, хранение 7 суток, повторное чтение; воркеры — consumer group |
-| `session_cache` | Redis Cluster | 192 GB, TTL, задержка меньше миллисекунды |
-| `metadata_cache` | Aerospike | 10,7 TB: в Redis (только RAM) нужно ≈360 узлов, в Aerospike (индекс в RAM, данные на NVMe) ≈35 |
-| `upload_buffer` | Redis (состояние) + Ceph NVMe-пул (чанки) | 104 TB байтов не место для БД; состояние загрузки (≈21 млн ключей, ≈2,7 GB) живёт в Redis с TTL 5 мин |
-| `notification_buffer` | RabbitMQ | Всего 1,5k msg/s и 383 MB; нужны ack и повтор с задержкой (DLX + TTL) |
-| `media_objects` (байты) | Ceph (S3/RGW) | 20,96 EB неизменяемых объектов по ≈5 MB, проблемы мелких файлов нет |
+| Таблица                                  | Хранилище                                 | Почему                                                                                                                                                                              |
+| ---------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`                                  | PostgreSQL «auth»                         | 384 GB, записей почти нет, нужны сильная консистентность и уникальность `email`                                                                                                     |
+| `sessions`                               | PostgreSQL «auth»                         | Отзыв сессии должен действовать сразу; 5,7k write QPS в пике выдерживает один primary, горячие чтения берёт `session_cache`                                                         |
+| `photos` (+ `media_objects`)             | Cassandra «meta»                          | 2,7 PB, 139k write QPS в пике; главный запрос — диапазон по `(owner_id, year, created_at)`; `LOCAL_QUORUM` даёт сильную консистентность в home-DC, межрегиональные копии асинхронны |
+| `face_profiles`                          | Cassandra «meta»                          | Много записей (139k QPS в пике), eventual-консистентность, чтение по `user_id`                                                                                                      |
+| `face_embeddings`                        | Cassandra «ml»                            | 8,6 PB, запись 139k QPS, чтение 1,3k QPS; отдельный кластер, чтобы фоновая запись не мешала чтению галереи                                                                          |
+| `albums`, `album_members`, `album_items` | PostgreSQL «social»                       | Сильная консистентность внутри альбома: все три таблицы в одном шарде (ключ `album_id`) и меняются одной транзакцией                                                                |
+| `shares`                                 | PostgreSQL «social»                       | Изменение прав требует сильной консистентности и read-after-write                                                                                                                   |
+| `user_access`                            | PostgreSQL «social»                       | Денормализованный список «что доступно пользователю» (п. 6.5)                                                                                                                       |
+| `notifications`                          | Cassandra «meta»                          | Выборка последних по `recipient_id`, TTL 30 суток встроен в СУБД, eventual-консистентность                                                                                          |
+| `search_index`                           | Cassandra «meta»                          | 4,3 PB, 139k write QPS; любой запрос ограничен одним `owner_id`, то есть одной партицией, фильтры закрывают SAI-индексы. Поисковых движков в стеке лекции нет                       |
+| `face_jobs`                              | Kafka                                     | Поток 69k msg/s (139k в пике), at-least-once, хранение 7 суток, повторное чтение; воркеры — consumer group                                                                          |
+| `session_cache`                          | Redis Cluster                             | 192 GB, TTL, задержка меньше миллисекунды                                                                                                                                           |
+| `metadata_cache`                         | Aerospike                                 | 10,7 TB: в Redis (только RAM) нужно ≈360 узлов, в Aerospike (индекс в RAM, данные на NVMe) ≈35                                                                                      |
+| `upload_buffer`                          | Redis (состояние) + Ceph NVMe-пул (чанки) | 104 TB байтов не место для БД; состояние загрузки (≈21 млн ключей, ≈2,7 GB) живёт в Redis с TTL 5 мин                                                                               |
+| `notification_buffer`                    | RabbitMQ                                  | Всего 1,5k msg/s и 383 MB; нужны ack и повтор с задержкой (DLX + TTL)                                                                                                               |
+| `media_objects` (байты)                  | Ceph (S3/RGW)                             | 20,96 EB неизменяемых объектов по ≈5 MB, проблемы мелких файлов нет                                                                                                                 |
 
 ### 6.3. Шардирование и резервирование (потаблично)
 
 Допущения для расчёта: шард PostgreSQL до 2 TB с индексами, узел Cassandra до 6 TB данных (12 TB NVMe, остальное под компакшены). Индексы PostgreSQL добавляют около 40% к объёму, SAI в Cassandra около 25% (допущение).
 
-| Таблица | Шардирование | Горячее резервирование |
-| --- | --- | --- |
-| `users`, `sessions` | Не шардируются: (384 + 420 GB) × 1,4 ≈ 1,1 TB на один кластер | Patroni: primary (Frankfurt) + sync-реплика в соседнем ДЦ (RPO = 0) + async-реплика в каждом из 7 регионов (чтение и DR); автофейловер ≈30 с через etcd |
-| `albums`, `album_members`, `album_items` | `hash(album_id)` → 4096 бакетов → **64 шарда**. `album_id` содержит код региона (3 бита). Шарды по регионам: NA 4, EU 9, LATAM 6, MENA 6, SSA 5, EAP 22, SA 12. Объём: `album_items` 30,2 TB + индексы 20,1 TB, всего ≈51,5 TB → ≈0,8 TB на шард | Каждый шард: Patroni, primary + sync + async DR в соседнем регионе (192 узла). Карта «бакет → шард» хранится в etcd, ребаланс без смены ключей |
-| `shares` | `hash(share_id)` → те же 64 шарда (код региона в `share_id`) | Как у `albums` |
-| `user_access` | `hash(user_id)` → те же 64 шарда | Как у `albums` |
-| `photos` | Cassandra, partition key `(owner_id, year)`: партиция ограничена одним годом одного владельца. 2,72 PB → **453 узла на копию** | RF 3 в home-DC + 2 в DR-DC (≈2 270 узлов). Пары DC: NA↔LATAM, EU↔MENA, EAP↔SA, SSA→EU. Запись и чтение `LOCAL_QUORUM` |
-| `search_index` | Cassandra, partition key `(owner_id, year)`. 4,33 PB × 1,25 (SAI) = 5,41 PB → **902 узла на копию** | RF 3+2 (≈4 510 узлов), `LOCAL_ONE` (eventual) |
-| `notifications`, `face_profiles` | Cassandra, partition key `recipient_id` / `user_id`; 0,5 и 2,3 TB, размещаются на тех же узлах «meta» | RF 3+2, `LOCAL_ONE` |
-| `face_embeddings` | Cassandra «ml», partition key `photo_id`. 8,62 PB → **1 437 узлов на копию** | RF 3 без DR (≈4 310 узлов): данные производные, при потере региона пересчитываются через `face_jobs` |
-| `face_jobs` | Kafka, ключ `photo_id`, 1 024 партиции, распределены по регионам пропорционально долям из п. 2.1.1. 8,06 TB × 3 = 24,2 TB | RF 3, `min.insync.replicas = 2`, `acks=all`, rack-awareness; 3 брокера в каждом регионе (21) |
-| `session_cache` | Redis Cluster, 16 384 слота по `CRC16(session_id)`. 192 GB × 1,5 (накладные расходы) = 288 GB, до 80 GB на master → **8 master** (EAP 2, остальные по 1) | Реплика на каждый master, автоматический failover; кеш восстанавливается из `sessions` |
-| `upload_buffer` | Состояние в тех же Redis; чанки в Ceph NVMe-пуле (≈104 TB в среднем, ≈208 TB в пике) | Redis как выше; Ceph 3 реплики; данные временные (TTL 5 мин) |
-| `metadata_cache` | Aerospike, 4096 партиций. 41,9 млрд записей × RF 2 = 83,9 млрд копий × 64 B индекса = 5,4 TB RAM → при 154 GB индекса на узел (256 GB RAM × 60%) **≈35 узлов**, не менее 3 на регион. Данные 21,5 TB на NVMe помещаются с запасом | RF 2: отказ узла не теряет данные; кеш восстанавливается из `photos` |
-| `notification_buffer` | Не шардируется: 383 MB | RabbitMQ, quorum queues, кластер из 3 узлов в каждом регионе |
-| `media_objects` (байты) | Ceph, CRUSH равномерно раскладывает объекты по OSD; `object_key` начинается с хеш-префикса | 3 реплики по стойкам (п. 2.3); асинхронная межрегиональная копия (RGW multisite) для failover из п. 3.6 |
+| Таблица                                  | Шардирование                                                                                                                                                                                                                                     | Горячее резервирование                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`, `sessions`                      | Не шардируются: (384 + 420 GB) × 1,4 ≈ 1,1 TB на один кластер                                                                                                                                                                                    | Patroni: primary (Frankfurt) + sync-реплика в соседнем ДЦ (RPO = 0) + async-реплика в каждом из 7 регионов (чтение и DR); автофейловер ≈30 с через etcd |
+| `albums`, `album_members`, `album_items` | `hash(album_id)` → 4096 бакетов → **64 шарда**. `album_id` содержит код региона (3 бита). Шарды по регионам: NA 4, EU 9, LATAM 6, MENA 6, SSA 5, EAP 22, SA 12. Объём: `album_items` 30,2 TB + индексы 20,1 TB, всего ≈51,5 TB → ≈0,8 TB на шард | Каждый шард: Patroni, primary + sync + async DR в соседнем регионе (192 узла). Карта «бакет → шард» хранится в etcd, ребаланс без смены ключей          |
+| `shares`                                 | `hash(share_id)` → те же 64 шарда (код региона в `share_id`)                                                                                                                                                                                     | Как у `albums`                                                                                                                                          |
+| `user_access`                            | `hash(user_id)` → те же 64 шарда                                                                                                                                                                                                                 | Как у `albums`                                                                                                                                          |
+| `photos`                                 | Cassandra, partition key `(owner_id, year)`: партиция ограничена одним годом одного владельца. 2,72 PB → **453 узла на копию**                                                                                                                   | RF 3 в home-DC + 2 в DR-DC (≈2 270 узлов). Пары DC: NA↔LATAM, EU↔MENA, EAP↔SA, SSA→EU. Запись и чтение `LOCAL_QUORUM`                                   |
+| `search_index`                           | Cassandra, partition key `(owner_id, year)`. 4,33 PB × 1,25 (SAI) = 5,41 PB → **902 узла на копию**                                                                                                                                              | RF 3+2 (≈4 510 узлов), `LOCAL_ONE` (eventual)                                                                                                           |
+| `notifications`, `face_profiles`         | Cassandra, partition key `recipient_id` / `user_id`; 0,5 и 2,3 TB, размещаются на тех же узлах «meta»                                                                                                                                            | RF 3+2, `LOCAL_ONE`                                                                                                                                     |
+| `face_embeddings`                        | Cassandra «ml», partition key `photo_id`. 8,62 PB → **1 437 узлов на копию**                                                                                                                                                                     | RF 3 без DR (≈4 310 узлов): данные производные, при потере региона пересчитываются через `face_jobs`                                                    |
+| `face_jobs`                              | Kafka, ключ `photo_id`, 1 024 партиции, распределены по регионам пропорционально долям из п. 2.1.1. 8,06 TB × 3 = 24,2 TB                                                                                                                        | RF 3, `min.insync.replicas = 2`, `acks=all`, rack-awareness; 3 брокера в каждом регионе (21)                                                            |
+| `session_cache`                          | Redis Cluster, 16 384 слота по `CRC16(session_id)`. 192 GB × 1,5 (накладные расходы) = 288 GB, до 80 GB на master → **8 master** (EAP 2, остальные по 1)                                                                                         | Реплика на каждый master, автоматический failover; кеш восстанавливается из `sessions`                                                                  |
+| `upload_buffer`                          | Состояние в тех же Redis; чанки в Ceph NVMe-пуле (≈104 TB в среднем, ≈208 TB в пике)                                                                                                                                                             | Redis как выше; Ceph 3 реплики; данные временные (TTL 5 мин)                                                                                            |
+| `metadata_cache`                         | Aerospike, 4096 партиций. 41,9 млрд записей × RF 2 = 83,9 млрд копий × 64 B индекса = 5,4 TB RAM → при 154 GB индекса на узел (256 GB RAM × 60%) **≈35 узлов**, не менее 3 на регион. Данные 21,5 TB на NVMe помещаются с запасом                | RF 2: отказ узла не теряет данные; кеш восстанавливается из `photos`                                                                                    |
+| `notification_buffer`                    | Не шардируется: 383 MB                                                                                                                                                                                                                           | RabbitMQ, quorum queues, кластер из 3 узлов в каждом регионе                                                                                            |
+| `media_objects` (байты)                  | Ceph, CRUSH равномерно раскладывает объекты по OSD; `object_key` начинается с хеш-префикса                                                                                                                                                       | 3 реплики по стойкам (п. 2.3); асинхронная межрегиональная копия (RGW multisite) для failover из п. 3.6                                                 |
 
 ### 6.4. Индексы
 
-| Таблица | Индексы | Для какого запроса |
-| --- | --- | --- |
-| `users` | PK `(user_id)`; UNIQUE `lower(email)` WHERE `deleted_at IS NULL` | Логин по email |
-| `sessions` | PK `(session_id)`; `(user_id)` WHERE `deleted_at IS NULL`; `(expires_at)` | Проверка токена; отзыв всех сессий пользователя; очистка просроченных |
-| `albums` | PK `(album_id)` | Открыть альбом («мои альбомы» — через `user_access`) |
-| `album_members` | PK `(album_id, user_id)` | Проверка членства и роли |
-| `album_items` | PK `(album_id, photo_id)`; `(album_id, added_at DESC, photo_id)` WHERE `deleted_at IS NULL` | Уникальность фото в альбоме; страница альбома по порядку добавления |
-| `shares` | PK `(share_id)`; `(resource_id)` WHERE `deleted_at IS NULL`; `(expires_at)` WHERE `expires_at IS NOT NULL` | Открыть ссылку; отозвать все доступы к ресурсу; очистка просроченных |
-| `user_access` | PK `(user_id, resource_type, resource_id)`; `(user_id, created_at DESC)` WHERE `deleted_at IS NULL` | Список «мои и доступные мне альбомы и ссылки» |
-| `photos` | PK `((owner_id, year), created_at DESC, photo_id)` | Галерея: последние N фото, диапазон дат |
-| `search_index` | Та же PK + SAI по `camera`, `geo_cell`, `face_ids`, `terms` | Поиск внутри партиции владельца: дата, камера, геоданные, лица |
-| `notifications` | PK `((recipient_id), created_at DESC, notification_id)` | Последние уведомления пользователя |
-| `face_profiles` | PK `((user_id), face_id)` | Список людей в галерее пользователя |
-| `face_embeddings` | PK `((photo_id), embedding_id)` | Эмбеддинги лиц одной фотографии |
+| Таблица           | Индексы                                                                                                    | Для какого запроса                                                    |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `users`           | PK `(user_id)`; UNIQUE `lower(email)` WHERE `deleted_at IS NULL`                                           | Логин по email                                                        |
+| `sessions`        | PK `(session_id)`; `(user_id)` WHERE `deleted_at IS NULL`; `(expires_at)`                                  | Проверка токена; отзыв всех сессий пользователя; очистка просроченных |
+| `albums`          | PK `(album_id)`                                                                                            | Открыть альбом («мои альбомы» — через `user_access`)                  |
+| `album_members`   | PK `(album_id, user_id)`                                                                                   | Проверка членства и роли                                              |
+| `album_items`     | PK `(album_id, photo_id)`; `(album_id, added_at DESC, photo_id)` WHERE `deleted_at IS NULL`                | Уникальность фото в альбоме; страница альбома по порядку добавления   |
+| `shares`          | PK `(share_id)`; `(resource_id)` WHERE `deleted_at IS NULL`; `(expires_at)` WHERE `expires_at IS NOT NULL` | Открыть ссылку; отозвать все доступы к ресурсу; очистка просроченных  |
+| `user_access`     | PK `(user_id, resource_type, resource_id)`; `(user_id, created_at DESC)` WHERE `deleted_at IS NULL`        | Список «мои и доступные мне альбомы и ссылки»                         |
+| `photos`          | PK `((owner_id, year), created_at DESC, photo_id)`                                                         | Галерея: последние N фото, диапазон дат                               |
+| `search_index`    | Та же PK + SAI по `camera`, `geo_cell`, `face_ids`, `terms`                                                | Поиск внутри партиции владельца: дата, камера, геоданные, лица        |
+| `notifications`   | PK `((recipient_id), created_at DESC, notification_id)`                                                    | Последние уведомления пользователя                                    |
+| `face_profiles`   | PK `((user_id), face_id)`                                                                                  | Список людей в галерее пользователя                                   |
+| `face_embeddings` | PK `((photo_id), embedding_id)`                                                                            | Эмбеддинги лиц одной фотографии                                       |
 
 Для Redis, Aerospike, Kafka и RabbitMQ доступ идёт только по ключу или очереди, дополнительные индексы не нужны (primary index Aerospike лежит в RAM). Частичные индексы `WHERE deleted_at IS NULL` не хранят строки из «корзины». Во всех таблицах Cassandra, кроме `search_index`, вторичных индексов нет: запросы закрывает первичный ключ.
 
 ### 6.5. Денормализация
 
-| Что дублируем | Куда | Зачем | Как согласуем |
-| --- | --- | --- | --- |
-| Поля `media_objects` (`object_key`, `size_bytes`, `checksum`, `mime_type`) | В `photos` | Страница галереи читается одной выборкой по партиции, без N+1 обращений; 13,8k download QPS | Связь 1:1, объект неизменяем, рассинхрона нет |
-| `photo_owner_id`, `photo_created_at`, `object_key` | В `album_items` | Страница альбома без обращений в чужие партиции `photos` | Объект неизменяем; удаление фото помечает копии событием `photo.deleted` из Kafka |
-| `album_members` и `shares` по получателю | В `user_access` | «Мои и доступные мне альбомы» без запроса ко всем 64 шардам | Outbox в той же транзакции → Debezium → Kafka → обновление; eventual, лаг секунды. Права всегда проверяются по основным таблицам |
-| `title` альбома | В `user_access` | Список альбомов без join | Событие `album.renamed` |
-| `home_region` | В `sessions` и `session_cache` | Маршрутизация запроса в нужный регион без обращения к `users` | Не меняется после регистрации |
-| Готовые текст и превью | В `notifications.payload` | Уведомление показывается без join с `albums` и `photos` | Снимок на момент события, не обновляется |
-| Метаданные фото и `face_ids` | В `search_index` | Поиск без join | Обновление по событиям `photo.uploaded` и `face.recognized`, индекс можно пересобрать |
+| Что дублируем                                                              | Куда                           | Зачем                                                                                       | Как согласуем                                                                                                                    |
+| -------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Поля `media_objects` (`object_key`, `size_bytes`, `checksum`, `mime_type`) | В `photos`                     | Страница галереи читается одной выборкой по партиции, без N+1 обращений; 13,8k download QPS | Связь 1:1, объект неизменяем, рассинхрона нет                                                                                    |
+| `photo_owner_id`, `photo_created_at`, `object_key`                         | В `album_items`                | Страница альбома без обращений в чужие партиции `photos`                                    | Объект неизменяем; удаление фото помечает копии событием `photo.deleted` из Kafka                                                |
+| `album_members` и `shares` по получателю                                   | В `user_access`                | «Мои и доступные мне альбомы» без запроса ко всем 64 шардам                                 | Outbox в той же транзакции → Debezium → Kafka → обновление; eventual, лаг секунды. Права всегда проверяются по основным таблицам |
+| `title` альбома                                                            | В `user_access`                | Список альбомов без join                                                                    | Событие `album.renamed`                                                                                                          |
+| `home_region`                                                              | В `sessions` и `session_cache` | Маршрутизация запроса в нужный регион без обращения к `users`                               | Не меняется после регистрации                                                                                                    |
+| Готовые текст и превью                                                     | В `notifications.payload`      | Уведомление показывается без join с `albums` и `photos`                                     | Снимок на момент события, не обновляется                                                                                         |
+| Метаданные фото и `face_ids`                                               | В `search_index`               | Поиск без join                                                                              | Обновление по событиям `photo.uploaded` и `face.recognized`, индекс можно пересобрать                                            |
 
 ### 6.6. Клиентские библиотеки и интеграции
 
 Библиотеки указаны для Go; у всех перечисленных СУБД есть аналоги для Java и Python.
 
-| Хранилище | Клиент | Интеграции |
-| --- | --- | --- |
-| PostgreSQL | `pgx` v5 + `pgxpool`, `golang-migrate` | Patroni + etcd; Debezium (outbox → Kafka) |
-| Cassandra | `gocql` (token-aware, DC-aware, prepared statements) | Spark Cassandra Connector для пересборки `search_index` и перекластеризации лиц |
-| Redis | `go-redis` v9 (`ClusterClient`) | — |
-| Aerospike | `aerospike-client-go` | — |
-| Kafka | `franz-go`: идемпотентный producer, consumer groups | Debezium (Kafka Connect) |
-| RabbitMQ | `amqp091-go` (publisher confirms) | — |
-| Ceph | `aws-sdk-go-v2` (S3 API к RGW) | — |
-| etcd | `clientv3` | Карта шардов, DCS для Patroni |
+| Хранилище  | Клиент                                               | Интеграции                                                                      |
+| ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------------- |
+| PostgreSQL | `pgx` v5 + `pgxpool`, `golang-migrate`               | Patroni + etcd; Debezium (outbox → Kafka)                                       |
+| Cassandra  | `gocql` (token-aware, DC-aware, prepared statements) | Spark Cassandra Connector для пересборки `search_index` и перекластеризации лиц |
+| Redis      | `go-redis` v9 (`ClusterClient`)                      | —                                                                               |
+| Aerospike  | `aerospike-client-go`                                | —                                                                               |
+| Kafka      | `franz-go`: идемпотентный producer, consumer groups  | Debezium (Kafka Connect)                                                        |
+| RabbitMQ   | `amqp091-go` (publisher confirms)                    | —                                                                               |
+| Ceph       | `aws-sdk-go-v2` (S3 API к RGW)                       | —                                                                               |
+| etcd       | `clientv3`                                           | Карта шардов, DCS для Patroni                                                   |
 
 Основные потоки между хранилищами:
 
@@ -984,30 +1055,29 @@ flowchart LR
 
 ### 6.7. Балансировка запросов и мультиплексирование подключений
 
-| Хранилище | Балансировка | Мультиплексирование | Переключение при отказе |
-| --- | --- | --- | --- |
+| Хранилище  | Балансировка                                                                                                                                                             | Мультиплексирование                                                                             | Переключение при отказе                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | PostgreSQL | HAProxy: порт записи → primary, порт чтения → реплики (round-robin), health-check через Patroni REST (`/primary`, `/replica`); карту «бакет → шард» клиент берёт из etcd | PgBouncer, `pool_mode = transaction`: ≈10 000 клиентских соединений → ≈40–100 серверных на шард | Patroni выбирает нового primary (≈30 с), HAProxy переключается сам |
-| Cassandra | На клиенте: `TokenAwareHostPolicy` поверх DC-aware (`local_dc` = home-регион), speculative execution для чтения | 2–4 соединения на узел, запросы мультиплексируются по stream id | Драйвер уходит на другую реплику, при отказе DC — в DR-DC |
-| Redis | `ClusterClient`: карта слотов, `MOVED`/`ASK` | Пул соединений + pipelining | Кластер повышает реплику (≈5–10 с) |
-| Aerospike | Smart client с картой партиций, ходит сразу в нужный узел | — | Кластер мигрирует партиции |
-| Kafka | Producer: ключ → партиция; consumer group coordinator | Батчи (`linger.ms = 5`, lz4) | Выбор нового лидера партиции |
-| RabbitMQ | L4 HAProxy перед 3 узлами | Одно TCP-соединение на сервис, много каналов | Quorum queue выбирает нового лидера |
-| Ceph RGW | L7 Nginx (Storage Gateway из п. 4.1) → пул RGW | Keep-alive, multipart upload | RGW stateless, узел исключается из пула |
+| Cassandra  | На клиенте: `TokenAwareHostPolicy` поверх DC-aware (`local_dc` = home-регион), speculative execution для чтения                                                          | 2–4 соединения на узел, запросы мультиплексируются по stream id                                 | Драйвер уходит на другую реплику, при отказе DC — в DR-DC          |
+| Redis      | `ClusterClient`: карта слотов, `MOVED`/`ASK`                                                                                                                             | Пул соединений + pipelining                                                                     | Кластер повышает реплику (≈5–10 с)                                 |
+| Aerospike  | Smart client с картой партиций, ходит сразу в нужный узел                                                                                                                | —                                                                                               | Кластер мигрирует партиции                                         |
+| Kafka      | Producer: ключ → партиция; consumer group coordinator                                                                                                                    | Батчи (`linger.ms = 5`, lz4)                                                                    | Выбор нового лидера партиции                                       |
+| RabbitMQ   | L4 HAProxy перед 3 узлами                                                                                                                                                | Одно TCP-соединение на сервис, много каналов                                                    | Quorum queue выбирает нового лидера                                |
+| Ceph RGW   | L7 Nginx (Storage Gateway из п. 4.1) → пул RGW                                                                                                                           | Keep-alive, multipart upload                                                                    | RGW stateless, узел исключается из пула                            |
 
 ### 6.8. Схема резервного копирования
 
-| Данные | Схема | RPO / RTO |
-| --- | --- | --- |
-| PostgreSQL (`auth`, `social`) | pgBackRest с реплики: full раз в неделю + diff ежедневно + непрерывная архивация WAL (`archive_timeout = 60 s`) в Ceph S3 другого региона; PITR; хранение 30 суток; восстановление проверяется раз в месяц | RPO ≤ 1 мин (в регионе 0 благодаря sync-реплике); RTO шарда 0,8 TB ≈30 мин |
+| Данные                                                | Схема                                                                                                                                                                                                                                         | RPO / RTO                                                                           |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| PostgreSQL (`auth`, `social`)                         | pgBackRest с реплики: full раз в неделю + diff ежедневно + непрерывная архивация WAL (`archive_timeout = 60 s`) в Ceph S3 другого региона; PITR; хранение 30 суток; восстановление проверяется раз в месяц                                    | RPO ≤ 1 мин (в регионе 0 благодаря sync-реплике); RTO шарда 0,8 TB ≈30 мин          |
 | Cassandra: `photos`, `notifications`, `face_profiles` | От потери узлов и региона защищает RF 3+2. От логических ошибок: корзина 30 суток (`deleted_at`) и ежесуточные snapshots (hardlinks) на узлах, хранение 3 суток. Полная копия `photos` (2,7 PB) не делается: она стоила бы как само хранилище | RPO ≈ 0 внутри региона; восстановление ошибочно удалённых данных из snapshot — часы |
-| Cassandra: `search_index` | Не бэкапится: производные данные, пересобираются из `photos` и `face_embeddings` | Пересборка занимает дни, до этого поиск работает на DR-копии |
-| Cassandra: `face_embeddings` | RF 3, snapshots 3 суток; при потере пересчитываются через `face_jobs` | — |
-| Redis, Aerospike | Не бэкапятся: кеши, восстанавливаются из PostgreSQL и Cassandra | — |
-| Kafka | Не бэкапится: хранение 7 суток, события восстанавливаются из outbox и Cassandra | — |
-| RabbitMQ | Quorum-реплики, TTL сообщений 1 ч; топология (exchanges, queues, policies) выгружается в Git | — |
-| Ceph (файлы) | Объекты неизменяемы, 3 реплики по стойкам, асинхронная копия в соседний регион. Удаление пользователем — `deleted_at`, сборщик удаляет объект через 30 суток | RPO ≈ 0 внутри региона |
-| etcd | `etcdctl snapshot save` каждые 30 мин в Ceph S3, хранение 7 суток | RPO ≤ 30 мин, RTO ≈ 15 мин |
-
+| Cassandra: `search_index`                             | Не бэкапится: производные данные, пересобираются из `photos` и `face_embeddings`                                                                                                                                                              | Пересборка занимает дни, до этого поиск работает на DR-копии                        |
+| Cassandra: `face_embeddings`                          | RF 3, snapshots 3 суток; при потере пересчитываются через `face_jobs`                                                                                                                                                                         | —                                                                                   |
+| Redis, Aerospike                                      | Не бэкапятся: кеши, восстанавливаются из PostgreSQL и Cassandra                                                                                                                                                                               | —                                                                                   |
+| Kafka                                                 | Не бэкапится: хранение 7 суток, события восстанавливаются из outbox и Cassandra                                                                                                                                                               | —                                                                                   |
+| RabbitMQ                                              | Quorum-реплики, TTL сообщений 1 ч; топология (exchanges, queues, policies) выгружается в Git                                                                                                                                                  | —                                                                                   |
+| Ceph (файлы)                                          | Объекты неизменяемы, 3 реплики по стойкам, асинхронная копия в соседний регион. Удаление пользователем — `deleted_at`, сборщик удаляет объект через 30 суток                                                                                  | RPO ≈ 0 внутри региона                                                              |
+| etcd                                                  | `etcdctl snapshot save` каждые 30 мин в Ceph S3, хранение 7 суток                                                                                                                                                                             | RPO ≤ 30 мин, RTO ≈ 15 мин                                                          |
 
 [^3]: DAU/MAU Ratio (Stickiness): Definition, Formula & Benchmarks // IdeaPlan. 2024. URL: https://www.ideaplan.io/metrics/dau-mau-ratio-stickiness
 
