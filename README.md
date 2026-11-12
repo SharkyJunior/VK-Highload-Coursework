@@ -1493,7 +1493,119 @@ PostgreSQL, transactional outbox, события Kafka, таблица `notifica
 
 На схеме показаны два независимых входных контура (CDN/media и API), все сервисы отдельными узлами, хранилища, шины событий и контур наблюдаемости. Схема даёт общую картину по слоям: стрелки показывают направление запроса и событий между слоями, а связи каждого сервиса с конкретными базами, топиками и другими сервисами не рисуются, чтобы схема оставалась читаемой. Они описаны в каталоге сервисов (п. 10.3) и сводных матрицах (п. 10.3.3, 10.3.4).
 
-![Схема взаимодействия сервисов](10-1-diagram.png)
+```mermaid
+flowchart TB
+    classDef edge fill:#c8e6c9,stroke:#4caf50,color:#000
+    classDef svc fill:#bbdefb,stroke:#1976d2,color:#000
+    classDef store fill:#ffe0b2,stroke:#f57c00,color:#000
+    classDef worker fill:#fff59d,stroke:#fbc02d,color:#000
+    classDef bus fill:#e0e0e0,stroke:#757575,color:#000
+    classDef mon fill:#ffcdd2,stroke:#e57373,color:#000
+    classDef ext fill:#fff,stroke:#999,stroke-dasharray:4 3,color:#000
+
+    Client["Клиенты<br/>мобильное приложение, web"]
+
+    subgraph MON["Метрики и логирование"]
+        direction LR
+        Vector["Vector<br/>агенты сбора логов"] --> Loki["Loki<br/>хранилище логов"] --> Grafana["Grafana<br/>дашборды, просмотр логов"]
+        Prometheus["Prometheus<br/>метрики"] --> Grafana
+        Prometheus --> Alertmanager["Alertmanager<br/>алерты дежурным"]
+    end
+
+    GeoDNS["GeoDNS<br/>media: по home-региону<br/>api: по задержке"]
+    API["API-контур, 14 ДЦ<br/>BGP Anycast → L3 ECMP → L4 IPVS<br/>→ L7 Nginx: TLS, upstream-пулы"]
+    CDN["CDN-контур, 32 площадки<br/>BGP Anycast → L3 ECMP → L4 IPVS<br/>→ L7 Nginx: TLS, маршрутизация"]
+    SG["Storage Gateway<br/>multipart-загрузка, отдача файлов"]
+
+    Client -->|адрес региона| GeoDNS
+    Client -->|"HTTPS: API"| API
+    Client -->|загрузка и скачивание файлов| CDN
+    CDN --> SG
+
+    %% ---------- сервисы ----------
+    Auth["Auth Service<br/>сессии, home_region<br/>(сессию проверяют все сервисы<br/>через session_cache)"]
+    Meta["Metadata Service<br/>список фото, object_key"]
+    Search["Search Service<br/>поиск по метаданным и лицам"]
+    Albums["Albums Service<br/>альбомы, участники,<br/>список своих альбомов"]
+    Sharing["Sharing Service<br/>выдача, открытие и отзыв ссылок,<br/>читает share.revoked из Kafka"]
+    Notif["Notifications Service<br/>список уведомлений"]
+
+    API -->|маршрутизация по URL| Auth & Meta & Search & Albums & Sharing & Notif
+    SG -->|проверка сессии| Auth
+
+    %% общение между сервисами
+    Albums -->|"gRPC: данные фото"| Meta
+    Sharing -->|"gRPC: права на альбом"| Albums
+    Search -->|"gRPC: данные фото"| Meta
+
+    %% ---------- хранилища ----------
+    PGAuth[("PostgreSQL auth<br/>sessions, users, глобальный")]
+    Redis[("Redis<br/>session_cache, share_cache,<br/>состояние загрузки")]
+    Aero[("Aerospike<br/>metadata_cache")]
+    Cass[("Cassandra<br/>photos, search_index,<br/>face_photos, notifications")]
+    CassML[("Cassandra ml<br/>face_embeddings, face_profiles")]
+    etcd[("etcd<br/>карта бакет → шард")]
+    PGAlb[("PostgreSQL albums<br/>album_items, album_members, outbox,<br/>64 шарда в регионе")]
+    PGShare[("PostgreSQL shares<br/>shares, outbox, региональный")]
+    PGAcc[("PostgreSQL user_access<br/>региональный")]
+    Ceph[("Ceph RGW<br/>файлы фотографий")]
+
+    Auth -->|sessions| PGAuth
+    Auth -->|session_cache| Redis
+    Meta -->|горячие метаданные| Aero
+    Meta -->|photos| Cass
+    Search -->|search_index, face_photos| Cass
+    Notif -->|notifications| Cass
+    Albums -->|"карта шардов"| etcd
+    Albums -->|"hash(album_id)"| PGAlb
+    Albums -->|мои и расшаренные альбомы| PGAcc
+    Sharing -->|"shares, открытие ссылки"| PGShare
+    Sharing -->|"share_cache, TTL 60 с"| Redis
+
+    SG -->|состояние загрузки, TTL 5 мин| Redis
+    SG -->|чанки и объект| Ceph
+    SG -->|"метаданные, LOCAL_QUORUM"| Cass
+
+    %% ---------- асинхронный контур ----------
+    Kafka["Kafka<br/>photo.uploaded, face-jobs, face.recognized,<br/>album.events, share.events"]:::bus
+    Debezium["Debezium<br/>читает outbox"]
+    NotifW["Notification Worker<br/>запись уведомлений, задания на push"]
+    Proj["Access Projector<br/>проекция user_access"]
+    FaceW["Face Worker<br/>эмбеддинги лиц, привязка к профилям,<br/>публикует face.recognized"]
+    Indexer["Indexer<br/>обновляет search_index"]
+    Regroup["Face Regroup Job<br/>Spark: перегруппировка лиц с face_id = 0"]
+    Rabbit["RabbitMQ<br/>очередь push, очередь ошибок"]:::bus
+    Push["Push Sender<br/>отправка с повторами"]
+    APNs["APNs, FCM<br/>push клиенту"]
+
+    SG -.->|photo.uploaded, face-jobs| Kafka
+    PGAlb -.->|outbox| Debezium
+    PGShare -.->|outbox| Debezium
+    Debezium -.->|album.events, share.events| Kafka
+    Kafka -.->|share.revoked| Sharing
+    Kafka -.->|album.events, share.events| NotifW
+    Kafka -.->|album.events, share.events| Proj
+    Kafka -.->|face-jobs| FaceW
+    Kafka -.->|photo.uploaded, face.recognized| Indexer
+
+    NotifW -->|notifications| Cass
+    NotifW -.->|задания push| Rabbit
+    Rabbit -.-> Push --> APNs
+    Proj -->|"user_access в home_region получателя"| PGAcc
+    FaceW -->|читает изображение| Ceph
+    FaceW -->|face_embeddings, face_profiles| CassML
+    FaceW -->|face_photos| Cass
+    Indexer -->|search_index| Cass
+    Regroup -->|face_embeddings, face_profiles, face_photos| CassML
+    Regroup --> Cass
+
+    class GeoDNS,API,CDN,SG edge
+    class Auth,Meta,Search,Albums,Sharing,Notif svc
+    class PGAuth,Redis,Aero,Cass,CassML,etcd,PGAlb,PGShare,PGAcc,Ceph store
+    class Debezium,NotifW,Proj,FaceW,Indexer,Regroup,Push worker
+    class Vector,Loki,Grafana,Prometheus,Alertmanager mon
+    class APNs ext
+```
 
 Кластеры PostgreSQL `shares` и `user_access` региональные (по `home_region`), `auth` — глобальный, а базы `albums` разнесены по 64 шардам внутри регионов. Данные пользователя всегда лежат в контуре его `home_region` (п. 3.1, раздел 6).
 
